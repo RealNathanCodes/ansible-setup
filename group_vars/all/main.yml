@@ -1,0 +1,29 @@
+---
+# Shared vars for every host. Lives in group_vars/all/ rather than
+# group_vars/all.yml: when both exist Ansible only loads the directory, and
+# the directory is needed for the git-ignored user_variables.yml (git
+# identity, written by scripts/set_user_variables.sh).
+
+# Regular (non-root) user that per-user roles configure: shell/prompt,
+# rootless podman, dotfiles. Defaults to the SSH user for remote hosts. Override per host in
+# host_vars when the login user differs from the desktop user.
+primary_user: "{{ ansible_user | default(lookup('ansible.builtin.env', 'USER')) }}"
+
+# Public keys to install in primary_user's authorized_keys (Phase 6 SSH
+# hardening). Password auth is only disabled on hosts where this is
+# non-empty. To pull them from GitHub instead of listing them:
+#   ssh_authorized_keys: "{{ lookup('ansible.builtin.url', 'https://github.com/' ~ github_username ~ '.keys', wantlist=true) }}"
+ssh_authorized_keys: []
+
+# Packages every host gets (Phase 2 base role). Only names that are the same
+# on pacman, dnf and apt belong here; distro-specific extras go in
+# group_vars/{arch,fedora,ubuntu}.yml as base_packages_distro.
+base_packages:
+  - git
+  - curl
+  - wget
+  - vim
+  - htop
+  - rsync
+  - unzip
+  - tar

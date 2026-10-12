@@ -1,0 +1,106 @@
+---
+# Install: native package where the distro ships one (Arch), otherwise the
+# upstream installer. Fedora only has it via COPR and Ubuntu LTS not at all.
+- name: Install starship (native package)
+  ansible.builtin.package:
+    name: starship
+    state: present
+  when: ansible_facts["os_family"] == "Archlinux"
+
+- name: Check for existing upstream starship binary
+  ansible.builtin.stat:
+    path: "{{ starship_install_dir }}/starship"
+  register: starship_binary
+  when: ansible_facts["os_family"] != "Archlinux"
+
+- name: Install starship (upstream installer)
+  when:
+    - ansible_facts["os_family"] != "Archlinux"
+    - not starship_binary.stat.exists
+  block:
+    - name: Download starship installer
+      ansible.builtin.get_url:
+        url: https://starship.rs/install.sh
+        dest: /tmp/starship-install.sh
+        mode: "0755"
+
+    - name: Run starship installer
+      ansible.builtin.command:
+        cmd: /tmp/starship-install.sh --yes --bin-dir {{ starship_install_dir }}
+        creates: "{{ starship_install_dir }}/starship"
+
+# Per-user config
+- name: Look up starship user's home directory
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ starship_user }}"
+
+- name: Set starship user home fact
+  ansible.builtin.set_fact:
+    starship_user_home: "{{ ansible_facts['getent_passwd'][starship_user][4] }}"
+
+- name: Ensure config directories exist
+  ansible.builtin.file:
+    path: "{{ starship_user_home }}/{{ item }}"
+    state: directory
+    owner: "{{ starship_user }}"
+    # Additive only: don't loosen dirs fish/XDG created as 0700.
+    mode: "u+rwx"
+  loop:
+    - .config
+    - .config/fish
+    - .config/fish/conf.d
+
+- name: Deploy starship.toml
+  ansible.builtin.copy:
+    src: starship.toml
+    dest: "{{ starship_user_home }}/.config/starship.toml"
+    owner: "{{ starship_user }}"
+    mode: "0644"
+
+# conf.d snippets rather than overwriting config.fish, so existing fish
+# config on the machine is left alone.
+- name: Enable starship in fish
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (starship role)
+      if status is-interactive
+          starship init fish | source
+      end
+    dest: "{{ starship_user_home }}/.config/fish/conf.d/starship.fish"
+    owner: "{{ starship_user }}"
+    mode: "0644"
+  when: starship_fish_init | bool
+
+- name: Enable starship in bash
+  ansible.builtin.blockinfile:
+    path: "{{ starship_user_home }}/.bashrc"
+    create: true
+    owner: "{{ starship_user }}"
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: starship"
+    block: |
+      if [[ $- == *i* ]] && command -v starship >/dev/null 2>&1; then
+          eval "$(starship init bash)"
+      fi
+  when: starship_bash_init | bool
+
+# Carried over from computer_setup: on WSL, use Windows git.exe inside
+# /mnt/c so it sees the Windows credential manager and line-ending config.
+- name: Install WSL git wrapper for fish
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (starship role)
+      function git --wraps git
+          if pwd -P | string match -qr '^/mnt/c(/|$)'
+              git.exe $argv
+          else
+              command git $argv
+          end
+      end
+    dest: "{{ starship_user_home }}/.config/fish/conf.d/wsl-git.fish"
+    owner: "{{ starship_user }}"
+    mode: "0644"
+  when:
+    - starship_fish_init | bool
+    - "'microsoft' in ansible_facts['kernel'] | lower"

@@ -1,0 +1,10 @@
+---
+# Install with: ansible-galaxy install -r requirements.yml
+
+collections:
+  - name: community.general # ufw, snap, flatpak/flatpak_remote modules
+  - name: ansible.posix     # firewalld, sysctl, and other POSIX-y modules
+
+roles: []
+  # Add galaxy roles here as they're needed, e.g.:
+  # - name: geerlingguy.security

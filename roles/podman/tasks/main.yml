@@ -1,0 +1,103 @@
+---
+# Rootless podman + podman-compose. Nothing here runs containers as root:
+# the system-wide (rootful) API socket is kept disabled and podman-docker
+# (the root-ish docker CLI shim) isn't installed.
+- name: Refuse to set up podman for root
+  ansible.builtin.assert:
+    that: podman_user != "root"
+    fail_msg: "podman_user must be a regular user; this role only configures rootless podman."
+
+- name: Install podman and podman-compose
+  ansible.builtin.package:
+    name:
+      - podman
+      - podman-compose
+    state: present
+
+# newuidmap/newgidmap ship in shadow on Arch/Fedora, but in a separate
+# package on Ubuntu/Debian.
+- name: Install rootless user namespace helpers (Debian family)
+  ansible.builtin.package:
+    name: uidmap
+    state: present
+  when: ansible_facts["os_family"] == "Debian"
+
+- name: Keep rootful podman API socket disabled
+  ansible.builtin.systemd_service:
+    name: podman.socket
+    enabled: false
+    state: stopped
+
+# Subordinate IDs: Fedora/Ubuntu's useradd usually allocates these, Arch's
+# doesn't. Without them rootless podman can only map a single UID.
+- name: Ensure subordinate ID files exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: touch
+    owner: root
+    group: root
+    mode: "0644"
+    access_time: preserve
+    modification_time: preserve
+  loop:
+    - /etc/subuid
+    - /etc/subgid
+
+- name: Read subordinate ID files
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop:
+    - /etc/subuid
+    - /etc/subgid
+  register: podman_subid_files
+
+- name: Work out subordinate ID allocation
+  ansible.builtin.set_fact:
+    podman_subuid_lines: "{{ (podman_subid_files.results[0].content | b64decode).splitlines() }}"
+    podman_subgid_lines: "{{ (podman_subid_files.results[1].content | b64decode).splitlines() }}"
+    # First ID past every existing range in either file, so the new range
+    # never overlaps another user's.
+    podman_subid_start: >-
+      {%- set ns = namespace(next=podman_subid_min | int) -%}
+      {%- for f in podman_subid_files.results -%}
+      {%- for line in (f.content | b64decode).splitlines() if line.count(':') == 2 -%}
+      {%- set end = line.split(':')[1] | int + line.split(':')[2] | int -%}
+      {%- if end > ns.next -%}{%- set ns.next = end -%}{%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ ns.next }}
+
+- name: Allocate subordinate UIDs to {{ podman_user }}
+  ansible.builtin.command:
+    cmd: >-
+      usermod --add-subuids
+      {{ podman_subid_start }}-{{ podman_subid_start | int + podman_subid_count | int - 1 }}
+      {{ podman_user }}
+  when: podman_subuid_lines | select('match', '^' ~ podman_user ~ ':') | list | length == 0
+  register: podman_subuid_added
+  changed_when: true
+
+- name: Allocate subordinate GIDs to {{ podman_user }}
+  ansible.builtin.command:
+    cmd: >-
+      usermod --add-subgids
+      {{ podman_subid_start }}-{{ podman_subid_start | int + podman_subid_count | int - 1 }}
+      {{ podman_user }}
+  when: podman_subgid_lines | select('match', '^' ~ podman_user ~ ':') | list | length == 0
+  register: podman_subgid_added
+  changed_when: true
+
+# Podman caches the user namespace layout; make it pick up the new ranges.
+- name: Migrate existing rootless podman storage
+  ansible.builtin.command:
+    cmd: podman system migrate
+  become: true
+  become_user: "{{ podman_user }}"
+  when: podman_subuid_added is changed or podman_subgid_added is changed
+  changed_when: true
+
+- name: Enable lingering for {{ podman_user }}
+  ansible.builtin.command:
+    cmd: loginctl enable-linger {{ podman_user }}
+    creates: /var/lib/systemd/linger/{{ podman_user }}
+  when: podman_enable_linger | bool

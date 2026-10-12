@@ -1,0 +1,17 @@
+{
+    "workbench.colorTheme": "Witch Hazel",
+    "window.restoreWindows": "none",
+    "workbench.startupEditor": "none",
+    "editor.fontSize": 16,
+    "editor.fontFamily": "'FiraCode Nerd Font', 'Droid Sans Mono', 'monospace', monospace",
+    "telemetry.enableTelemetry": false,
+    "telemetry.enableCrashReporter": false,
+    "terminal.integrated.initialHint": false,
+    "chat.viewSessions.orientation": "stacked",
+    "git.confirmSync": false,
+    "claudeCode.preferredLocation": "sidebar",
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "workbench.browser.openLocalhostLinks": false
+}

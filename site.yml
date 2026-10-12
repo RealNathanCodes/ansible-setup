@@ -1,0 +1,53 @@
+---
+# Single entry-point playbook. Run against the whole inventory or scope with
+# -l/--limit and --tags as roles get added. Servers and desktops stay in one
+# file so shared base/firewall roles aren't duplicated across playbooks.
+
+# Sort every targeted host into a distro-family group (arch / fedora /
+# ubuntu) based on ansible_os_family, so derivatives (Manjaro, EndeavourOS,
+# Nobara, Mint, Pop!_OS, ...) land in the right group without being listed.
+# Unsupported families fail here instead of half-way through a role.
+- name: Classify hosts by distro family
+  hosts: all
+  gather_facts: true
+  vars:
+    distro_family_groups:
+      Archlinux: arch
+      RedHat: fedora
+      Debian: ubuntu
+  tasks:
+    - name: Fail on unsupported distro family
+      ansible.builtin.assert:
+        that: ansible_facts["os_family"] in distro_family_groups
+        fail_msg: >-
+          {{ ansible_facts["distribution"] }} (os_family
+          {{ ansible_facts["os_family"] }}) is not supported; expected one of
+          {{ distro_family_groups.keys() | join(", ") }}.
+        quiet: true
+      tags: [always]
+
+    - name: Add host to its distro family group
+      ansible.builtin.group_by:
+        key: "{{ distro_family_groups[ansible_facts['os_family']] }}"
+      changed_when: false
+      tags: [always]
+
+# Facts gathered above stay in memory for the rest of the run, so the plays
+# below don't gather again.
+- name: Configure servers
+  hosts: servers
+  gather_facts: false
+  become: true
+  roles:
+    - role: podman
+      tags: [podman, containers]
+
+- name: Configure desktops/laptops
+  hosts: desktops
+  gather_facts: false
+  become: true
+  roles:
+    - role: starship
+      tags: [starship, shell]
+    - role: podman
+      tags: [podman, containers]

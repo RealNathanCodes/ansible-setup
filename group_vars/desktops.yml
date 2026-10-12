@@ -1,0 +1,8 @@
+---
+# Vars for hosts in the desktops group. Overrides role defaults and
+# group_vars/all; host_vars still win.
+
+# Desktops have a logged-in user session, so rootless containers don't need
+# linger to keep running (role default, stated here for contrast with
+# servers.yml).
+podman_enable_linger: false

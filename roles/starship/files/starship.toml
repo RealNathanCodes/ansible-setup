@@ -1,0 +1,85 @@
+command_timeout=500
+scan_timeout=500
+
+format = """
+[┌─\\[$directory\\]─\\[$username$hostname\\]─>](bold green)
+[│ \
+($shlvl)\
+($kubernetes)\
+($git_branch)\
+($git_commit)\
+($git_state)\
+($git_metrics)\
+($git_status)\
+($docker_context)\
+($package)\
+($cmake)\
+($cobol)\
+($dart)\
+($deno)\
+($dotnet)\
+($elixir)\
+($elm)\
+($erlang)\
+($golang)\
+($helm)\
+($java)\
+($julia)\
+($kotlin)\
+($lua)\
+($nim)\
+($nodejs)\
+($ocaml)\
+($perl)\
+($php)\
+($purescript)\
+($python)\
+($rlang)\
+($red)\
+($ruby)\
+($rust)\
+($scala)\
+($swift)\
+($terraform)\
+($vlang)\
+($vagrant)\
+($zig)\
+($nix_shell)\
+($memory_usage)\
+($aws)\
+($gcloud)\
+($openstack)\
+($env_var)\
+($crystal)\
+($custom)\
+($cmd_duration)\
+($jobs)\
+($battery)\
+($time)\
+($status)](bold green)
+[└─$character](bold green)"""
+
+[time]
+disabled = true
+
+[directory]
+format = "[$path]($style)[$read_only]($read_only_style)"
+truncation_symbol = ".../"
+truncation_length = 2
+truncate_to_repo = false
+fish_style_pwd_dir_length = 2
+
+[git_branch]
+format = "[$symbol$branch]($style) "
+
+[hostname]
+ssh_only = false
+format = "[$hostname]($style)"
+style = "bold green"
+
+[username]
+style_user = "cyan bold"
+style_root = "red bold"
+format = "[$user]($style)@"
+disabled = false
+show_always = false

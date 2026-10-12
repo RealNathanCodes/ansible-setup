@@ -1,0 +1,13 @@
+---
+# User who runs containers. Podman is set up rootless for this user only;
+# the role refuses to target root. Defaults to primary_user (group_vars/all).
+podman_user: "{{ primary_user | default(ansible_user) | default(lookup('ansible.builtin.env', 'USER')) }}"
+
+# Subordinate UID/GID range handed to podman_user if it has none yet.
+# The start is bumped past any ranges already allocated to other users.
+podman_subid_min: 100000
+podman_subid_count: 65536
+
+# Keep the user's containers/systemd units running after logout (useful on
+# servers, not needed on desktops).
+podman_enable_linger: false

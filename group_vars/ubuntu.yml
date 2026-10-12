@@ -1,0 +1,11 @@
+---
+# Ubuntu 25.10+ defaults to sudo-rs, whose password prompt Ansible's sudo
+# become plugin never sees (tasks time out waiting for it). The classic sudo
+# still ships alongside it as sudo.ws, so use that there. Facts come from the
+# classification play in site.yml. ansible-core 2.22 matches sudo-rs prompts
+# (ansible/ansible#86175, #86964); delete this file once on 2.22+.
+ansible_become_exe: >-
+  {{ 'sudo.ws'
+     if ansible_facts['distribution'] | default('') == 'Ubuntu'
+        and ansible_facts['distribution_version'] | default('0') is version('25.10', '>=')
+     else 'sudo' }}

@@ -1,0 +1,11 @@
+---
+# User whose shell gets the starship config. Defaults to primary_user
+# (group_vars/all).
+starship_user: "{{ primary_user | default(ansible_user) | default(lookup('ansible.builtin.env', 'USER')) }}"
+
+# Where the upstream installer puts the binary on distros without a native package.
+starship_install_dir: /usr/local/bin
+
+# Wire starship into these shells' init files.
+starship_fish_init: true
+starship_bash_init: true

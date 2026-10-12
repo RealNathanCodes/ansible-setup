@@ -1,0 +1,7 @@
+---
+# Vars for hosts in the servers group. Overrides role defaults and
+# group_vars/all; host_vars still win.
+
+# Rootless containers are tied to the user's systemd session, so without
+# linger they stop when the last SSH session closes.
+podman_enable_linger: true
