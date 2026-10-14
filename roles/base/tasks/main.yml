@@ -1,0 +1,71 @@
+---
+# Runs first on every host: bring the system up to date, then install the
+# base package set. Dispatches on os_package_manager from
+# group_vars/{arch,fedora,ubuntu}.yml.
+- name: Check distro family vars are loaded
+  ansible.builtin.assert:
+    that: os_package_manager | default('') in ["pacman", "dnf", "apt"]
+    fail_msg: >-
+      os_package_manager is unset or unknown ({{ os_package_manager | default('undefined') }}).
+      It comes from group_vars/{arch,fedora,ubuntu}.yml, which only apply
+      after the classification play in site.yml has run.
+    quiet: true
+  tags: [always]
+
+# Refresh the index even when not upgrading, or installs on a fresh host
+# fail on stale mirrors.
+- name: Refresh apt package index
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: "{{ base_apt_cache_valid_time }}"
+  when: os_package_manager == "apt"
+
+- name: Upgrade all packages (apt)
+  ansible.builtin.apt:
+    upgrade: dist
+  when:
+    - os_package_manager == "apt"
+    - base_upgrade_packages | bool
+  tags: [upgrade]
+
+# Arch doesn't support partial upgrades: syncing the database (-Sy) without
+# also upgrading (-u) can leave newly installed packages linked against
+# libraries the system doesn't have yet. So the sync only ever happens
+# together with the upgrade, never on its own.
+- name: Upgrade all packages (pacman)
+  community.general.pacman:
+    update_cache: true
+    upgrade: true
+  when:
+    - os_package_manager == "pacman"
+    - base_upgrade_packages | bool
+  tags: [upgrade]
+
+# dnf refreshes expired metadata itself, so no separate cache step. On
+# Fedora 41+ the module picks the dnf5 backend automatically.
+- name: Upgrade all packages (dnf)
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+    update_cache: true
+  when:
+    - os_package_manager == "dnf"
+    - base_upgrade_packages | bool
+  tags: [upgrade]
+
+- name: Install base packages
+  ansible.builtin.package:
+    name: "{{ base_package_list }}"
+    state: present
+
+- name: Check whether a reboot is pending (apt)
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: base_reboot_required
+  when: os_package_manager == "apt"
+
+# Reported, not acted on: rebooting is left to whoever runs the playbook.
+- name: Report pending reboot
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }} needs a reboot to finish applying updates."
+  when: base_reboot_required.stat.exists | default(false)

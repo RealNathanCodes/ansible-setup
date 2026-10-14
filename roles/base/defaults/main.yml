@@ -1,0 +1,11 @@
+---
+# Upgrade every installed package on each run. Set false (or run with
+# --skip-tags upgrade) to only install what's missing.
+base_upgrade_packages: true
+
+# Seconds an apt package index stays fresh before it's refreshed again.
+base_apt_cache_valid_time: 3600
+
+# Packages to install: the cross-distro list plus the family's extras
+# (group_vars/all/main.yml and group_vars/{arch,fedora,ubuntu}.yml).
+base_package_list: "{{ (base_packages | default([])) + (base_packages_distro | default([])) }}"

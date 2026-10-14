@@ -1,0 +1,13 @@
+---
+# Only install updates flagged as security fixes. Set false to apply every
+# available update (apt: also the -updates pocket; dnf: upgrade_type default).
+auto_updates_security_only: true
+
+# Reboot automatically when an update needs it (new kernel, libc, ...). Off by
+# default, matching the base role, which reports pending reboots but never
+# reboots.
+auto_updates_reboot: false
+
+# Local time apt reboots at, when auto_updates_reboot is on. dnf-automatic
+# reboots right after the run that needed it (shutdown -r +5).
+auto_updates_reboot_time: "04:00"

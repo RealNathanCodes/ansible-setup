@@ -1,0 +1,109 @@
+---
+# Unattended updates between playbook runs. Dispatches on os_package_manager
+# from group_vars/{arch,fedora,ubuntu}.yml: unattended-upgrades on apt,
+# dnf-automatic on dnf. Arch is skipped on purpose (see the last task).
+
+# apt: unattended-upgrades, run by the stock apt-daily-upgrade.timer.
+- name: Configure unattended-upgrades (apt)
+  when: os_package_manager == "apt"
+  block:
+    # Preinstalled on Ubuntu, but not on Debian or minimal images.
+    - name: Install unattended-upgrades
+      ansible.builtin.apt:
+        name: unattended-upgrades
+        state: present
+
+    # Same file `dpkg-reconfigure unattended-upgrades` writes.
+    - name: Enable periodic unattended upgrades
+      ansible.builtin.copy:
+        content: |
+          // Managed by Ansible (auto_updates role)
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        owner: root
+        group: root
+        mode: "0644"
+
+    # Overrides on top of the distro's 50unattended-upgrades, which is left
+    # alone so package upgrades can keep updating it. Its default origins are
+    # security-only; list entries here are appended to those.
+    - name: Configure unattended-upgrades options
+      ansible.builtin.copy:
+        content: |
+          // Managed by Ansible (auto_updates role)
+          {% if not auto_updates_security_only | bool %}
+          Unattended-Upgrade::Origins-Pattern {
+                  "origin=${distro_id},archive=${distro_codename}-updates";
+          };
+          {% endif %}
+          Unattended-Upgrade::Automatic-Reboot "{{ auto_updates_reboot | bool | lower }}";
+          Unattended-Upgrade::Automatic-Reboot-Time "{{ auto_updates_reboot_time }}";
+        dest: /etc/apt/apt.conf.d/52ansible-unattended-upgrades
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Enable apt periodic timers
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - apt-daily.timer
+        - apt-daily-upgrade.timer
+
+# dnf: dnf-automatic. Fedora 41+ (pkg_mgr dnf5) ships it as a dnf5 plugin
+# with its own timer name; RHEL clones still use the dnf4 package.
+- name: Configure dnf-automatic (dnf)
+  when: os_package_manager == "dnf"
+  vars:
+    auto_updates_dnf5: "{{ ansible_facts['pkg_mgr'] == 'dnf5' }}"
+  block:
+    - name: Install dnf-automatic
+      ansible.builtin.dnf:
+        name: "{{ 'dnf5-plugin-automatic' if auto_updates_dnf5 else 'dnf-automatic' }}"
+        state: present
+
+    # Set individual keys rather than templating the file: on dnf5 it only
+    # holds overrides of /usr/share/dnf5/dnf5-plugins/automatic.conf, on dnf4
+    # it's the packaged full config.
+    - name: Configure dnf-automatic options
+      community.general.ini_file:
+        path: /etc/dnf/automatic.conf
+        section: commands
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
+        create: true
+        owner: root
+        group: root
+        mode: "0644"
+      loop:
+        - option: upgrade_type
+          value: "{{ 'security' if auto_updates_security_only | bool else 'default' }}"
+        - option: download_updates
+          value: "yes"
+        - option: apply_updates
+          value: "yes"
+        - option: reboot
+          value: "{{ 'when-needed' if auto_updates_reboot | bool else 'never' }}"
+      loop_control:
+        label: "{{ item.option }}"
+
+    - name: Enable dnf-automatic timer
+      ansible.builtin.systemd_service:
+        name: "{{ 'dnf5-automatic.timer' if auto_updates_dnf5 else 'dnf-automatic.timer' }}"
+        enabled: true
+        state: started
+
+# Arch has no supported unattended upgrade mechanism: upgrades can need
+# manual steps announced on archlinux.org/news, and a download-only
+# `pacman -Syuw` syncs the database without upgrading (a partial upgrade
+# waiting to happen; see the base role). Arch hosts get updated by playbook
+# runs instead.
+- name: Report that Arch hosts are skipped
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }} is Arch-based; automatic updates are not set up.
+      Run the playbook (base role) to upgrade it.
+  when: os_package_manager == "pacman"

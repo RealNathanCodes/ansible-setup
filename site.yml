@@ -39,6 +39,10 @@
   gather_facts: false
   become: true
   roles:
+    - role: base
+      tags: [base]
+    - role: auto_updates
+      tags: [auto_updates, updates]
     - role: podman
       tags: [podman, containers]
 
@@ -47,6 +51,8 @@
   gather_facts: false
   become: true
   roles:
+    - role: base
+      tags: [base]
     - role: starship
       tags: [starship, shell]
     - role: podman

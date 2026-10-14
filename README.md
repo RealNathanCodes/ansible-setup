@@ -24,6 +24,10 @@ See [TODO.md](TODO.md) for the full build-out plan and scope decisions.
   Role vars that differ between servers and desktops (e.g.
   `podman_enable_linger`) go in `group_vars/servers.yml` /
   `group_vars/desktops.yml`.
+  Per-distro-family vars go in `group_vars/arch.yml` / `fedora.yml` /
+  `ubuntu.yml`: the family map (`os_package_manager`, `os_firewall_backend`,
+  `os_snapd_source`, `os_snap_needs_symlink`) that roles dispatch on, and
+  `base_packages_distro` for packages whose names differ per distro.
 - `secrets/` — git-ignored, never committed: SSH keys, the vault password and
   per-host secret vars (see below).
 - `roles/` — this project's own roles.
@@ -134,4 +138,6 @@ uv is older, `uv tool install ansible-core` works too, since
 
 | Role | Tags | Applies to | What it does |
 |------|------|------------|--------------|
+| `base` | `base`, `upgrade` | all hosts (first role) | Upgrades all packages (apt `dist-upgrade`, `pacman -Syu`, `dnf upgrade`; skip with `--skip-tags upgrade` or `base_upgrade_packages: false`), installs `base_packages` + `base_packages_distro`, reports a pending reboot on apt hosts. |
+| `auto_updates` | `auto_updates`, `updates` | servers | Unattended updates between runs: `unattended-upgrades` on apt hosts, `dnf-automatic` on dnf hosts (`dnf5-plugin-automatic` on Fedora 41+). Security updates only and no automatic reboot by default (`auto_updates_security_only`, `auto_updates_reboot`). Arch hosts are skipped with a message, since Arch has no supported unattended upgrade path. |
 | `starship` | `starship`, `shell` | desktops | Installs starship (pacman on Arch, upstream installer elsewhere), deploys `~/.config/starship.toml`, adds init to fish (`conf.d/starship.fish`) and bash (managed block in `~/.bashrc`). |

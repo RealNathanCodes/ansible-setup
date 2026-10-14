@@ -15,15 +15,13 @@ primary_user: "{{ ansible_user | default(lookup('ansible.builtin.env', 'USER')) 
 #   ssh_authorized_keys: "{{ lookup('ansible.builtin.url', 'https://github.com/' ~ github_username ~ '.keys', wantlist=true) }}"
 ssh_authorized_keys: []
 
-# Packages every host gets (Phase 2 base role). Only names that are the same
-# on pacman, dnf and apt belong here; distro-specific extras go in
-# group_vars/{arch,fedora,ubuntu}.yml as base_packages_distro.
+# Packages every host gets (base role). Only packages something in this repo
+# needs, not ones that might come in handy: a role that needs a tool installs
+# it itself unless it's here. Names must be the same on pacman, dnf and apt;
+# distro-specific ones go in group_vars/{arch,fedora,ubuntu}.yml as
+# base_packages_distro.
 base_packages:
-  - git
+  # starship's upstream installer (Fedora/Ubuntu) downloads with curl and
+  # unpacks a .tar.gz.
   - curl
-  - wget
-  - vim
-  - htop
-  - rsync
-  - unzip
   - tar

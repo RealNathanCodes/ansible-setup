@@ -1,0 +1,14 @@
+---
+# Vars for the fedora group (os_family RedHat: Fedora, Nobara, and also
+# RHEL/Rocky/Alma). The group is created at runtime by the classification
+# play in site.yml; see group_vars/arch.yml and ubuntu.yml for the other
+# families.
+
+# Distro-family map, read by the base, firewall and app-install roles.
+os_package_manager: dnf
+os_firewall_backend: firewalld
+# In the Fedora repos; RHEL clones need EPEL for it.
+os_snapd_source: dnf
+# Classic-confinement snaps (VS Code) expect /snap; Fedora mounts them under
+# /var/lib/snapd/snap.
+os_snap_needs_symlink: true

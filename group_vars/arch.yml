@@ -1,0 +1,13 @@
+---
+# Vars for the arch group (os_family Archlinux: Arch, Manjaro, EndeavourOS,
+# ...). The group is created at runtime by the classification play in
+# site.yml; see group_vars/fedora.yml and ubuntu.yml for the other families.
+
+# Distro-family map, read by the base, firewall and app-install roles.
+os_package_manager: pacman
+os_firewall_backend: ufw
+# snapd isn't in the official repos, only the AUR.
+os_snapd_source: aur
+# Classic-confinement snaps (VS Code) expect /snap; Arch mounts them under
+# /var/lib/snapd/snap.
+os_snap_needs_symlink: true

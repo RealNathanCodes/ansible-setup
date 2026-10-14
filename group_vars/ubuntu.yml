@@ -1,9 +1,20 @@
 ---
+# Vars for the ubuntu group (os_family Debian: Ubuntu, Mint, Pop!_OS, and also
+# plain Debian). The group is created at runtime by the classification play
+# in site.yml; see group_vars/arch.yml and fedora.yml for the other families.
+
+# Distro-family map, read by the base, firewall and app-install roles.
+os_package_manager: apt
+os_firewall_backend: ufw
+# Preinstalled on Ubuntu, but not on Debian, Mint or minimal server images.
+os_snapd_source: apt
+os_snap_needs_symlink: false
+
 # Ubuntu 25.10+ defaults to sudo-rs, whose password prompt Ansible's sudo
 # become plugin never sees (tasks time out waiting for it). The classic sudo
 # still ships alongside it as sudo.ws, so use that there. Facts come from the
 # classification play in site.yml. ansible-core 2.22 matches sudo-rs prompts
-# (ansible/ansible#86175, #86964); delete this file once on 2.22+.
+# (ansible/ansible#86175, #86964); delete this setting once on 2.22+.
 ansible_become_exe: >-
   {{ 'sudo.ws'
      if ansible_facts['distribution'] | default('') == 'Ubuntu'
